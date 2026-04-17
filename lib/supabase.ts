@@ -18,5 +18,6 @@ export interface Report {
   address?: string;
   status: ReportStatus;
   votes: number;
+  user_name: string;
   created_at: string;
 }

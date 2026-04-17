@@ -113,7 +113,7 @@ export default function ReportsPanel({ reports, onRefresh }: ReportsPanelProps) 
                   )}
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="text-xs text-gray-400">👤</span>
-                    <span className="text-xs text-gray-500 font-medium">{(report as any).user_name || "Anónimo"}</span>
+                    <span className="text-xs text-gray-500 font-medium">{report.user_name || "Anónimo"}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-400">{timeAgo(report.created_at)}</span>

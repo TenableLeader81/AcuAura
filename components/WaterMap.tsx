@@ -138,19 +138,27 @@ export default function WaterMap({
       heatCirclesRef.current.forEach((c) => c.remove());
       heatCirclesRef.current = [];
 
-      // Heatmap: semi-transparent circles by zone density
       const activeReports = reports.filter((r) => r.status !== "resuelto");
+
+      // Heatmap: inner + outer rings for each active report
       activeReports.forEach((report) => {
         const cfg = reportTypeConfig[report.type] || reportTypeConfig.otro;
-        // Outer glow
-        const glow = L.circle([report.lat, report.lng], {
-          radius: 1200,
+        const outer = L.circle([report.lat, report.lng], {
+          radius: 1400,
           color: cfg.color,
           fillColor: cfg.color,
-          fillOpacity: 0.08,
+          fillOpacity: 0.18,
+          weight: 1.5,
+          opacity: 0.5,
+        }).addTo(mapInstanceRef.current);
+        const inner = L.circle([report.lat, report.lng], {
+          radius: 600,
+          color: cfg.color,
+          fillColor: cfg.color,
+          fillOpacity: 0.45,
           weight: 0,
         }).addTo(mapInstanceRef.current);
-        heatCirclesRef.current.push(glow);
+        heatCirclesRef.current.push(outer, inner);
       });
 
       // Report markers
@@ -158,17 +166,17 @@ export default function WaterMap({
         const cfg = reportTypeConfig[report.type] || reportTypeConfig.otro;
         const isResolved = report.status === "resuelto";
         const icon = L.divIcon({
-          html: `<div style="background:${isResolved ? "#6b7280" : cfg.color};border:2px solid white;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.3);${isResolved ? "opacity:0.5;" : ""}">
+          html: `<div style="background:${isResolved ? "#6b7280" : cfg.color};border:3px solid white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.5);${isResolved ? "opacity:0.5;" : ""}">
             ${cfg.icon}</div>`,
           className: "",
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
         });
         const marker = L.marker([report.lat, report.lng], { icon, zIndexOffset: -100 })
           .addTo(mapInstanceRef.current);
         marker.bindTooltip(
-          `<b>${cfg.icon} ${report.type.replace("_", " ")}</b><br/>📍 ${report.municipality}${report.address ? " · " + report.address : ""}<br/>👍 ${report.votes} confirmaciones`,
-          { direction: "top", offset: [0, -8] }
+          `<b>${cfg.icon} ${report.type.replace("_", " ")}</b><br/>📍 ${report.municipality}${report.address ? " · " + report.address : ""}<br/>👤 ${report.user_name || "Anónimo"}<br/>👍 ${report.votes} confirmaciones`,
+          { direction: "top", offset: [0, -10] }
         );
         reportMarkersRef.current.push(marker);
       });
