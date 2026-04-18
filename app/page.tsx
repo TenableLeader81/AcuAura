@@ -12,6 +12,21 @@ import { supabase, Report } from "@/lib/supabase";
 
 const WaterMap = dynamic(() => import("@/components/WaterMap"), { ssr: false });
 
+function MobileSheetHandle({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100 bg-white flex-shrink-0">
+      <div className="w-10 h-1 bg-gray-300 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-2" />
+      <div />
+      <button
+        onClick={onClose}
+        className="ml-auto flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+      >
+        ✕ Cerrar
+      </button>
+    </div>
+  );
+}
+
 type SidePanel = "quality" | "reports" | null;
 
 export default function Home() {
@@ -136,32 +151,35 @@ export default function Home() {
             selectedSource={selectedSource}
             onMapClick={handleMapClick}
             reportingMode={reportingMode}
+            panelOpen={sidePanel !== null}
           />
         </div>
 
         {/* Side panel — desktop: right column, mobile: bottom sheet */}
         {sidePanel === "quality" && selectedSource && (
           <>
-            {/* Desktop */}
             <div className="hidden sm:block w-80 flex-shrink-0 shadow-xl z-10 border-l border-gray-200 overflow-hidden">
               <WaterQualityPanel source={selectedSource} onClose={() => { setSidePanel(null); setSelectedSource(null); }} />
             </div>
-            {/* Mobile bottom sheet */}
-            <div className="sm:hidden absolute bottom-0 left-0 right-0 max-h-[60vh] shadow-2xl z-[800] rounded-t-2xl overflow-hidden border-t border-gray-200">
-              <WaterQualityPanel source={selectedSource} onClose={() => { setSidePanel(null); setSelectedSource(null); }} />
+            <div className="sm:hidden absolute bottom-0 left-0 right-0 max-h-[62vh] shadow-2xl z-[800] rounded-t-2xl overflow-hidden bg-white">
+              <MobileSheetHandle onClose={() => { setSidePanel(null); setSelectedSource(null); }} />
+              <div className="overflow-y-auto" style={{ maxHeight: "calc(62vh - 44px)" }}>
+                <WaterQualityPanel source={selectedSource} onClose={() => { setSidePanel(null); setSelectedSource(null); }} />
+              </div>
             </div>
           </>
         )}
 
         {sidePanel === "reports" && (
           <>
-            {/* Desktop */}
             <div className="hidden sm:block w-80 flex-shrink-0 shadow-xl z-10 border-l border-gray-200 overflow-hidden">
               <ReportsPanel reports={reports} onRefresh={fetchReports} />
             </div>
-            {/* Mobile bottom sheet */}
-            <div className="sm:hidden absolute bottom-0 left-0 right-0 h-[60vh] shadow-2xl z-[800] rounded-t-2xl overflow-hidden border-t border-gray-200">
-              <ReportsPanel reports={reports} onRefresh={fetchReports} />
+            <div className="sm:hidden absolute bottom-0 left-0 right-0 h-[62vh] shadow-2xl z-[800] rounded-t-2xl overflow-hidden bg-white">
+              <MobileSheetHandle onClose={() => setSidePanel(null)} />
+              <div className="overflow-y-auto h-[calc(62vh-44px)]">
+                <ReportsPanel reports={reports} onRefresh={fetchReports} />
+              </div>
             </div>
           </>
         )}

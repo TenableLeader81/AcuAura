@@ -13,6 +13,7 @@ interface WaterMapProps {
   selectedSource: WaterSource | null;
   onMapClick: (lat: number, lng: number) => void;
   reportingMode: boolean;
+  panelOpen: boolean;
 }
 
 const typeIcons: Record<string, string> = {
@@ -30,7 +31,7 @@ const reportTypeConfig: Record<string, { icon: string; color: string }> = {
 };
 
 export default function WaterMap({
-  sources, routes, reports, onSelectSource, selectedSource, onMapClick, reportingMode,
+  sources, routes, reports, onSelectSource, selectedSource, onMapClick, reportingMode, panelOpen,
 }: WaterMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -144,18 +145,18 @@ export default function WaterMap({
       activeReports.forEach((report) => {
         const cfg = reportTypeConfig[report.type] || reportTypeConfig.otro;
         const outer = L.circle([report.lat, report.lng], {
-          radius: 1400,
+          radius: 500,
           color: cfg.color,
           fillColor: cfg.color,
-          fillOpacity: 0.18,
+          fillOpacity: 0.2,
           weight: 1.5,
-          opacity: 0.5,
+          opacity: 0.6,
         }).addTo(mapInstanceRef.current);
         const inner = L.circle([report.lat, report.lng], {
-          radius: 600,
+          radius: 200,
           color: cfg.color,
           fillColor: cfg.color,
-          fillOpacity: 0.45,
+          fillOpacity: 0.5,
           weight: 0,
         }).addTo(mapInstanceRef.current);
         heatCirclesRef.current.push(outer, inner);
@@ -187,31 +188,37 @@ export default function WaterMap({
     <div className="relative w-full h-full overflow-hidden shadow-lg">
       <div ref={mapRef} className="w-full h-full" />
 
-      {/* Reporting mode banner */}
+      {/* Hide zoom controls on mobile when panel is open */}
+      {panelOpen && (
+        <style>{`.leaflet-control-zoom { display: none !important; }`}</style>
+      )}
+
       {reportingMode && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[1000] flex items-center gap-2 animate-pulse">
           📍 Haz clic en el mapa para marcar el problema
         </div>
       )}
 
-      {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur rounded-lg p-3 shadow-md text-xs z-[1000]">
-        <p className="font-semibold text-gray-700 mb-2">Calidad del agua</p>
-        {Object.entries(qualityColorMap).map(([level, color]) => (
-          <div key={level} className="flex items-center gap-2 mb-1">
-            <span style={{ backgroundColor: color }} className="w-3 h-3 rounded-full inline-block" />
-            <span className="capitalize text-gray-600">{level}</span>
-          </div>
-        ))}
-        <hr className="my-2 border-gray-200" />
-        <p className="font-semibold text-gray-700 mb-1">Reportes</p>
-        {Object.entries(reportTypeConfig).map(([key, cfg]) => (
-          <div key={key} className="flex items-center gap-1.5 mb-1">
-            <span>{cfg.icon}</span>
-            <span className="capitalize text-gray-600">{key.replace("_", " ")}</span>
-          </div>
-        ))}
-      </div>
+      {/* Legend — hidden on mobile when panel open */}
+      {!panelOpen && (
+        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur rounded-lg p-3 shadow-md text-xs z-[1000]">
+          <p className="font-semibold text-gray-700 mb-2">Calidad del agua</p>
+          {Object.entries(qualityColorMap).map(([level, color]) => (
+            <div key={level} className="flex items-center gap-2 mb-1">
+              <span style={{ backgroundColor: color }} className="w-3 h-3 rounded-full inline-block" />
+              <span className="capitalize text-gray-600">{level}</span>
+            </div>
+          ))}
+          <hr className="my-2 border-gray-200" />
+          <p className="font-semibold text-gray-700 mb-1">Reportes</p>
+          {Object.entries(reportTypeConfig).map(([key, cfg]) => (
+            <div key={key} className="flex items-center gap-1.5 mb-1">
+              <span>{cfg.icon}</span>
+              <span className="capitalize text-gray-600">{key.replace("_", " ")}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
