@@ -9,6 +9,7 @@ import StatsBar from "@/components/StatsBar";
 import ReportModal from "@/components/ReportModal";
 import ReportsPanel from "@/components/ReportsPanel";
 import { supabase, Report } from "@/lib/supabase";
+import ChatBot from "@/components/ChatBot";
 
 const WaterMap = dynamic(() => import("@/components/WaterMap"), { ssr: false });
 
@@ -209,6 +210,8 @@ export default function Home() {
           {toast}
         </div>
       )}
+
+      <ChatBot />
     </div>
   );
 }
