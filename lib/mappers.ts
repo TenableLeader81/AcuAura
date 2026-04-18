@@ -1,20 +1,16 @@
 import { WaterSource, WaterQuality, QualityLevel } from "@/types/water";
 import { PozoData, ZonaCalidad } from "@/lib/dbQueries";
 
-// Zona coordinates lookup — matches zona names to approximate center coords
+// Zona coordinates — taken from geometry centroids in the data file
 const zonaCoordsMap: Record<string, [number, number]> = {
-  "Centro Histórico":      [20.5881, -100.3899],
-  "Jurica":                [20.7001, -100.4512],
-  "San Pedro Mártir":      [20.5612, -100.3721],
-  "Villa Corregidora":     [20.5214, -100.3672],
-  "Lomas de Querétaro":    [20.6102, -100.4231],
-  "Amazcala":              [20.7234, -100.2345],
-  "Chichimequillas":       [20.6891, -100.2012],
-  "Tierra Blanca":         [20.6543, -100.1987],
-  "San Juan del Río Centro":[20.3889, -99.9976],
-  "La Llave":              [20.4123, -99.9512],
-  "El Marqués Centro":     [20.6331, -100.1853],
-  "Zibatá":                [20.6721, -100.3124],
+  "Juriquilla":             [20.7055, -100.4475],
+  "Centro Histórico":       [20.5888, -100.3890],
+  "Candiles":               [20.5460, -100.4065],
+  "Milenio III":            [20.5965, -100.3560],
+  "Satélite":               [20.6045, -100.4405],
+  "Amazcala":               [20.7500, -100.2500],
+  "Chichimequillas":        [20.7800, -100.3200],
+  "San Juan del Río Centro":[20.3800, -99.9900],
 };
 
 function clasificacionToLevel(c: string): QualityLevel {
