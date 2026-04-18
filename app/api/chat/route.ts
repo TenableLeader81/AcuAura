@@ -47,7 +47,7 @@ ${reportSummary}
 Responde de forma conversacional y útil. Si preguntan por una colonia o municipio específico, filtra la información relevante.`;
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-2.5-flash",
       systemInstruction: systemPrompt,
     });
 
