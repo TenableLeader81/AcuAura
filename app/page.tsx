@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { WaterSource } from "@/types/water";
 import { waterRoutes } from "@/data/waterSources";
 import { mapPozosToSources, mapZonasToSources } from "@/lib/mappers";
@@ -13,8 +14,24 @@ import { supabase, Report } from "@/lib/supabase";
 import { fetchPozos, fetchResumenCalidadZonas } from "@/lib/dbQueries";
 import ChatBot from "@/components/ChatBot";
 import { ZoneData } from "@/components/WaterMap";
+import AuthGuard, { LogoutButton } from "@/components/AuthGuard";
 
 const WaterMap = dynamic(() => import("@/components/WaterMap"), { ssr: false });
+
+const ZONE_COORDS: Record<string, [number, number]> = {
+  "Centro Histórico":       [20.5881, -100.3899],
+  "Jurica":                 [20.7001, -100.4512],
+  "San Pedro Mártir":       [20.5612, -100.3721],
+  "Villa Corregidora":      [20.5214, -100.3672],
+  "Lomas de Querétaro":     [20.6102, -100.4231],
+  "Amazcala":               [20.7234, -100.2345],
+  "Chichimequillas":        [20.6891, -100.2012],
+  "Tierra Blanca":          [20.6543, -100.1987],
+  "San Juan del Río Centro":[20.3889, -99.9976],
+  "La Llave":               [20.4123, -99.9512],
+  "El Marqués Centro":      [20.6331, -100.1853],
+  "Zibatá":                 [20.6721, -100.3124],
+};
 
 function MobileSheetHandle({ onClose }: { onClose: () => void }) {
   return (
@@ -33,7 +50,9 @@ function MobileSheetHandle({ onClose }: { onClose: () => void }) {
 
 type SidePanel = "quality" | "reports" | null;
 
-export default function Home() {
+function MapPage({ userName, userRole }: { userName: string; userRole: "admin" | "user" }) {
+  const isAdmin = userRole === "admin";
+
   const [selectedSource, setSelectedSource] = useState<WaterSource | null>(null);
   const [filter, setFilter] = useState("all");
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
@@ -43,6 +62,7 @@ export default function Home() {
   const [waterSources, setWaterSources] = useState<WaterSource[]>([]);
   const [zones, setZones] = useState<ZoneData[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
   const filteredSources = useMemo(() => {
     if (filter === "all") return waterSources;
@@ -51,40 +71,21 @@ export default function Home() {
     if (["pozo", "presa", "manantial"].includes(filter))
       return waterSources.filter((s) => s.type === filter);
     return waterSources;
-  }, [filter]);
+  }, [filter, waterSources]);
 
-  // Load real water data from Supabase
   useEffect(() => {
     Promise.all([fetchPozos(), fetchResumenCalidadZonas()]).then(([pozos, zonas]) => {
-      const sources = [
-        ...mapPozosToSources(pozos),
-        ...mapZonasToSources(zonas),
-      ];
-      setWaterSources(sources.length > 0 ? sources : []);
-      // Build zone data for polygons
-      const zonaCoordsMap: Record<string, [number, number]> = {
-        "Centro Histórico": [20.5881, -100.3899],
-        "Jurica": [20.7001, -100.4512],
-        "San Pedro Mártir": [20.5612, -100.3721],
-        "Villa Corregidora": [20.5214, -100.3672],
-        "Lomas de Querétaro": [20.6102, -100.4231],
-        "Amazcala": [20.7234, -100.2345],
-        "Chichimequillas": [20.6891, -100.2012],
-        "Tierra Blanca": [20.6543, -100.1987],
-        "San Juan del Río Centro": [20.3889, -99.9976],
-        "La Llave": [20.4123, -99.9512],
-        "El Marqués Centro": [20.6331, -100.1853],
-        "Zibatá": [20.6721, -100.3124],
-      };
-      const zd: ZoneData[] = zonas
-        .filter((z) => zonaCoordsMap[z.zona])
-        .map((z) => ({
-          zona: z.zona,
-          clasificacion: z.clasificacion,
-          lat: zonaCoordsMap[z.zona]![0],
-          lng: zonaCoordsMap[z.zona]![1],
-        }));
-      setZones(zd);
+      setWaterSources([...mapPozosToSources(pozos), ...mapZonasToSources(zonas)]);
+      setZones(
+        zonas
+          .filter((z) => ZONE_COORDS[z.zona])
+          .map((z) => ({
+            zona: z.zona,
+            clasificacion: z.clasificacion,
+            lat: ZONE_COORDS[z.zona]![0],
+            lng: ZONE_COORDS[z.zona]![1],
+          }))
+      );
     });
   }, []);
 
@@ -118,12 +119,6 @@ export default function Home() {
     setReportingMode(false);
   }, [reportingMode]);
 
-  function toggleReportingMode() {
-    setReportingMode((v) => !v);
-    setSelectedSource(null);
-    setSidePanel(null);
-  }
-
   function toggleReportsPanel() {
     setSidePanel((v) => (v === "reports" ? null : "reports"));
     setSelectedSource(null);
@@ -136,7 +131,6 @@ export default function Home() {
 
   const activeReports = reports.filter((r) => r.status !== "resuelto").length;
   const alertZones = zones.filter((z) => z.clasificacion === "Mala" || z.clasificacion === "Regular");
-  const [alertDismissed, setAlertDismissed] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans">
@@ -152,6 +146,19 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Admin-only nav */}
+            {isAdmin && (
+              <>
+                <Link href="/dashboard" className="hidden sm:flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-full transition-all">
+                  📊 Dashboard
+                </Link>
+                <Link href="/admin" className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-xs px-3 py-1.5 rounded-full transition-all">
+                  ⚙️ <span className="hidden sm:inline">Admin</span>
+                </Link>
+              </>
+            )}
+
+            {/* Reports panel button */}
             <button
               onClick={toggleReportsPanel}
               className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
@@ -167,15 +174,24 @@ export default function Home() {
               )}
             </button>
 
-            <button
-              onClick={toggleReportingMode}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
-                reportingMode ? "bg-red-500 text-white animate-pulse" : "bg-white text-blue-700 hover:bg-blue-50"
-              }`}
-            >
-              <span>{reportingMode ? "✕" : "⚠️"}</span>
-              <span>{reportingMode ? "Cancelar" : "Reportar"}</span>
-            </button>
+            {/* Report button — only for users */}
+            {!isAdmin && (
+              <button
+                onClick={() => {
+                  setReportingMode((v) => !v);
+                  setSelectedSource(null);
+                  setSidePanel(null);
+                }}
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full text-xs sm:text-sm font-semibold transition-all ${
+                  reportingMode ? "bg-red-500 text-white animate-pulse" : "bg-white text-blue-700 hover:bg-blue-50"
+                }`}
+              >
+                <span>{reportingMode ? "✕" : "⚠️"}</span>
+                <span>{reportingMode ? "Cancelar" : "Reportar"}</span>
+              </button>
+            )}
+
+            <LogoutButton name={userName} role={userRole} />
           </div>
         </div>
       </header>
@@ -189,25 +205,18 @@ export default function Home() {
           <span className="text-amber-500 text-lg flex-shrink-0">⚠️</span>
           <div className="flex-1 min-w-0">
             <p className="text-amber-800 text-xs font-semibold">Alertas de calidad del agua</p>
-            <p className="text-amber-700 text-xs mt-0.5 truncate">
+            <p className="text-amber-700 text-xs mt-0.5">
               {alertZones.filter(z => z.clasificacion === "Mala").length > 0 && (
                 <span className="text-red-600 font-semibold">
-                  Mala calidad: {alertZones.filter(z => z.clasificacion === "Mala").map(z => z.zona).join(", ")}.{" "}
+                  Mala: {alertZones.filter(z => z.clasificacion === "Mala").map(z => z.zona).join(", ")}.{" "}
                 </span>
               )}
               {alertZones.filter(z => z.clasificacion === "Regular").length > 0 && (
-                <span>
-                  Calidad regular: {alertZones.filter(z => z.clasificacion === "Regular").map(z => z.zona).join(", ")}.
-                </span>
+                <span>Regular: {alertZones.filter(z => z.clasificacion === "Regular").map(z => z.zona).join(", ")}.</span>
               )}
             </p>
           </div>
-          <button
-            onClick={() => setAlertDismissed(true)}
-            className="text-amber-500 hover:text-amber-700 text-sm flex-shrink-0 mt-0.5"
-          >
-            ✕
-          </button>
+          <button onClick={() => setAlertDismissed(true)} className="text-amber-500 hover:text-amber-700 text-sm flex-shrink-0 mt-0.5">✕</button>
         </div>
       )}
 
@@ -227,7 +236,6 @@ export default function Home() {
           />
         </div>
 
-        {/* Side panel — desktop: right column, mobile: bottom sheet */}
         {sidePanel === "quality" && selectedSource && (
           <>
             <div className="hidden sm:block w-80 flex-shrink-0 shadow-xl z-10 border-l border-gray-200 overflow-hidden">
@@ -258,12 +266,12 @@ export default function Home() {
 
         {!sidePanel && !reportingMode && (
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-800/80 text-white text-xs px-4 py-2 rounded-full backdrop-blur pointer-events-none z-[500] whitespace-nowrap">
-            Toca un marcador para ver calidad · ⚠️ Reportar un problema
+            {isAdmin ? "Toca un marcador para ver calidad" : "Toca un marcador para ver calidad · ⚠️ Reportar un problema"}
           </div>
         )}
       </div>
 
-      {pendingReport && (
+      {!isAdmin && pendingReport && (
         <ReportModal
           lat={pendingReport.lat}
           lng={pendingReport.lng}
@@ -282,7 +290,16 @@ export default function Home() {
         </div>
       )}
 
-      <ChatBot />
+      {/* ChatBot — only for regular users */}
+      {!isAdmin && <ChatBot />}
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthGuard>
+      {(user) => <MapPage userName={user.name} userRole={user.role} />}
+    </AuthGuard>
   );
 }

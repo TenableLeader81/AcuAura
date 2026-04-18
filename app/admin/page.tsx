@@ -3,13 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import AuthGuard, { LogoutButton } from "@/components/AuthGuard";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
-
-const ADMIN_PASSWORD = "acuaura2024";
 
 const STATUS_LABELS: Record<string, string> = {
   activo: "Activo", en_revision: "En revisión", resuelto: "Resuelto",
@@ -31,10 +30,7 @@ interface Report {
   user_name: string; created_at: string;
 }
 
-export default function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState("");
-  const [pwError, setPwError] = useState("");
+function AdminPanel({ userName }: { userName: string }) {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -58,19 +54,7 @@ export default function AdminPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    if (authed) fetchReports();
-  }, [authed, fetchReports]);
-
-  function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    if (pw === ADMIN_PASSWORD) {
-      setAuthed(true);
-      setPwError("");
-    } else {
-      setPwError("Contraseña incorrecta");
-    }
-  }
+  useEffect(() => { fetchReports(); }, [fetchReports]);
 
   async function deleteReport(id: string) {
     if (!confirm("¿Eliminar este reporte permanentemente?")) return;
@@ -121,40 +105,6 @@ export default function AdminPage() {
     return true;
   });
 
-  if (!authed) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-700 to-cyan-600 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
-          <div className="text-center mb-6">
-            <div className="text-4xl mb-2">🔐</div>
-            <h1 className="text-xl font-bold text-gray-800">Panel Administrador</h1>
-            <p className="text-sm text-gray-500 mt-1">AcuAura — Acceso restringido</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-              <input
-                type="password"
-                value={pw}
-                onChange={(e) => setPw(e.target.value)}
-                className="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="••••••••"
-                autoFocus
-              />
-              {pwError && <p className="text-red-500 text-xs mt-1">{pwError}</p>}
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl transition-colors"
-            >
-              Ingresar
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Header */}
@@ -167,9 +117,10 @@ export default function AdminPage() {
               <p className="text-xs text-blue-200">Panel de administración de reportes</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <Link href="/dashboard" className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-full transition-all">📊 Dashboard</Link>
-            <Link href="/" className="bg-white text-blue-700 hover:bg-blue-50 text-sm font-semibold px-4 py-2 rounded-full transition-all">← Mapa</Link>
+            <Link href="/" className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-full transition-all">🗺️ Mapa</Link>
+            <LogoutButton name={userName} role="admin" />
           </div>
         </div>
       </header>
@@ -303,5 +254,13 @@ export default function AdminPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminPage() {
+  return (
+    <AuthGuard role="admin">
+      {(user) => <AdminPanel userName={user.name} />}
+    </AuthGuard>
   );
 }

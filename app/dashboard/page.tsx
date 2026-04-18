@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
+import AuthGuard, { LogoutButton } from "@/components/AuthGuard";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, CartesianGrid, Legend,
@@ -25,7 +26,7 @@ const REPORT_LABELS: Record<string, string> = {
   baja_presion: "Baja presión", otro: "Otro",
 };
 
-export default function DashboardPage() {
+function DashboardContent({ userName }: { userName: string }) {
   const [reports, setReports] = useState<any[]>([]);
   const [calidad, setCalidad] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,9 +104,10 @@ export default function DashboardPage() {
               <p className="text-xs text-blue-200">Estadísticas de monitoreo hídrico</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Link href="/" className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-full transition-all">← Mapa</Link>
-            <Link href="/admin" className="bg-white text-blue-700 hover:bg-blue-50 text-sm font-semibold px-4 py-2 rounded-full transition-all">⚙️ Admin</Link>
+          <div className="flex items-center gap-2">
+            <Link href="/" className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-full transition-all">🗺️ Mapa</Link>
+            <Link href="/admin" className="bg-white/20 hover:bg-white/30 text-white text-sm px-4 py-2 rounded-full transition-all">⚙️ Admin</Link>
+            <LogoutButton name={userName} role="admin" />
           </div>
         </div>
       </header>
@@ -246,5 +248,13 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGuard role="admin">
+      {(user) => <DashboardContent userName={user.name} />}
+    </AuthGuard>
   );
 }
