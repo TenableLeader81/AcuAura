@@ -32,6 +32,8 @@ Respondes preguntas sobre calidad del agua, pozos, acuíferos, colonias y report
 Sé breve, claro y usa datos concretos. Responde siempre en español.
 Si no tienes datos suficientes, dilo honestamente.
 
+IMPORTANTE: Responde en texto plano, conversacional y natural. No uses markdown, no uses asteriscos, no uses negritas, no uses listas con guiones ni numeradas. Escribe como si fuera una conversación normal, en párrafos cortos y directos.
+
 === ACUÍFEROS DE QUERÉTARO ===
 ${buildAcuiferosSummary(acuiferos ?? [])}
 
