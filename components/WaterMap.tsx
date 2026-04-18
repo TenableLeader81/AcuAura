@@ -5,10 +5,18 @@ import { WaterSource, WaterRoute } from "@/types/water";
 import { qualityColorMap } from "@/data/waterSources";
 import { Report } from "@/lib/supabase";
 
+export interface ZoneData {
+  zona: string;
+  clasificacion: string | null;
+  lat: number;
+  lng: number;
+}
+
 interface WaterMapProps {
   sources: WaterSource[];
   routes: WaterRoute[];
   reports: Report[];
+  zones?: ZoneData[];
   onSelectSource: (source: WaterSource | null) => void;
   selectedSource: WaterSource | null;
   onMapClick: (lat: number, lng: number) => void;
@@ -30,8 +38,25 @@ const reportTypeConfig: Record<string, { icon: string; color: string }> = {
   otro:          { icon: "📝", color: "#6b7280" },
 };
 
+const QUALITY_POLYGON_COLORS: Record<string, string> = {
+  Excelente: "#22c55e",
+  Buena: "#84cc16",
+  Regular: "#f59e0b",
+  Mala: "#ef4444",
+};
+
+// Generate a rough hexagon polygon around a center point
+function hexagonAround(lat: number, lng: number, radiusDeg = 0.018): [number, number][] {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i - Math.PI / 6;
+    pts.push([lat + radiusDeg * Math.sin(angle), lng + radiusDeg * Math.cos(angle)]);
+  }
+  return pts;
+}
+
 export default function WaterMap({
-  sources, routes, reports, onSelectSource, selectedSource, onMapClick, reportingMode, panelOpen,
+  sources, routes, reports, zones = [], onSelectSource, selectedSource, onMapClick, reportingMode, panelOpen,
 }: WaterMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -39,6 +64,7 @@ export default function WaterMap({
   const polylinesRef = useRef<any[]>([]);
   const reportMarkersRef = useRef<any[]>([]);
   const heatCirclesRef = useRef<any[]>([]);
+  const zonePolygonsRef = useRef<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
 
   // Init map
@@ -128,6 +154,30 @@ export default function WaterMap({
       });
     });
   }, [mapReady, sources, routes, selectedSource, onSelectSource]);
+
+  // Draw zone quality polygons
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || zones.length === 0) return;
+    import("leaflet").then((L) => {
+      zonePolygonsRef.current.forEach((p) => p.remove());
+      zonePolygonsRef.current = [];
+      zones.forEach((z) => {
+        const color = QUALITY_POLYGON_COLORS[z.clasificacion ?? ""] ?? "#94a3b8";
+        const poly = L.polygon(hexagonAround(z.lat, z.lng), {
+          color,
+          fillColor: color,
+          fillOpacity: 0.22,
+          weight: 2,
+          opacity: 0.55,
+        }).addTo(mapInstanceRef.current);
+        poly.bindTooltip(
+          `<b>${z.zona}</b><br/>Calidad: <span style="color:${color}">&#9679;</span> ${z.clasificacion ?? "Sin datos"}`,
+          { sticky: true }
+        );
+        zonePolygonsRef.current.push(poly);
+      });
+    });
+  }, [mapReady, zones]);
 
   // Draw report markers + heatmap circles
   useEffect(() => {

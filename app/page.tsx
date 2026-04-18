@@ -12,6 +12,7 @@ import ReportsPanel from "@/components/ReportsPanel";
 import { supabase, Report } from "@/lib/supabase";
 import { fetchPozos, fetchResumenCalidadZonas } from "@/lib/dbQueries";
 import ChatBot from "@/components/ChatBot";
+import { ZoneData } from "@/components/WaterMap";
 
 const WaterMap = dynamic(() => import("@/components/WaterMap"), { ssr: false });
 
@@ -40,6 +41,7 @@ export default function Home() {
   const [pendingReport, setPendingReport] = useState<{ lat: number; lng: number } | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [waterSources, setWaterSources] = useState<WaterSource[]>([]);
+  const [zones, setZones] = useState<ZoneData[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const filteredSources = useMemo(() => {
@@ -59,6 +61,30 @@ export default function Home() {
         ...mapZonasToSources(zonas),
       ];
       setWaterSources(sources.length > 0 ? sources : []);
+      // Build zone data for polygons
+      const zonaCoordsMap: Record<string, [number, number]> = {
+        "Centro Histórico": [20.5881, -100.3899],
+        "Jurica": [20.7001, -100.4512],
+        "San Pedro Mártir": [20.5612, -100.3721],
+        "Villa Corregidora": [20.5214, -100.3672],
+        "Lomas de Querétaro": [20.6102, -100.4231],
+        "Amazcala": [20.7234, -100.2345],
+        "Chichimequillas": [20.6891, -100.2012],
+        "Tierra Blanca": [20.6543, -100.1987],
+        "San Juan del Río Centro": [20.3889, -99.9976],
+        "La Llave": [20.4123, -99.9512],
+        "El Marqués Centro": [20.6331, -100.1853],
+        "Zibatá": [20.6721, -100.3124],
+      };
+      const zd: ZoneData[] = zonas
+        .filter((z) => zonaCoordsMap[z.zona])
+        .map((z) => ({
+          zona: z.zona,
+          clasificacion: z.clasificacion,
+          lat: zonaCoordsMap[z.zona]![0],
+          lng: zonaCoordsMap[z.zona]![1],
+        }));
+      setZones(zd);
     });
   }, []);
 
@@ -109,6 +135,8 @@ export default function Home() {
   }
 
   const activeReports = reports.filter((r) => r.status !== "resuelto").length;
+  const alertZones = zones.filter((z) => z.clasificacion === "Mala" || z.clasificacion === "Regular");
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans">
@@ -155,6 +183,34 @@ export default function Home() {
       {/* Stats & Filters */}
       <StatsBar sources={waterSources} filter={filter} onFilterChange={setFilter} />
 
+      {/* Zone alerts banner */}
+      {!alertDismissed && alertZones.length > 0 && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-start gap-3 flex-shrink-0">
+          <span className="text-amber-500 text-lg flex-shrink-0">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-amber-800 text-xs font-semibold">Alertas de calidad del agua</p>
+            <p className="text-amber-700 text-xs mt-0.5 truncate">
+              {alertZones.filter(z => z.clasificacion === "Mala").length > 0 && (
+                <span className="text-red-600 font-semibold">
+                  Mala calidad: {alertZones.filter(z => z.clasificacion === "Mala").map(z => z.zona).join(", ")}.{" "}
+                </span>
+              )}
+              {alertZones.filter(z => z.clasificacion === "Regular").length > 0 && (
+                <span>
+                  Calidad regular: {alertZones.filter(z => z.clasificacion === "Regular").map(z => z.zona).join(", ")}.
+                </span>
+              )}
+            </p>
+          </div>
+          <button
+            onClick={() => setAlertDismissed(true)}
+            className="text-amber-500 hover:text-amber-700 text-sm flex-shrink-0 mt-0.5"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden relative">
         <div className="flex-1">
@@ -162,6 +218,7 @@ export default function Home() {
             sources={filteredSources}
             routes={waterRoutes}
             reports={reports}
+            zones={zones}
             onSelectSource={handleSelectSource}
             selectedSource={selectedSource}
             onMapClick={handleMapClick}
