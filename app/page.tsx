@@ -3,12 +3,14 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { WaterSource } from "@/types/water";
-import { waterSources, waterRoutes } from "@/data/waterSources";
+import { waterRoutes } from "@/data/waterSources";
+import { mapPozosToSources, mapZonasToSources } from "@/lib/mappers";
 import WaterQualityPanel from "@/components/WaterQualityPanel";
 import StatsBar from "@/components/StatsBar";
 import ReportModal from "@/components/ReportModal";
 import ReportsPanel from "@/components/ReportsPanel";
 import { supabase, Report } from "@/lib/supabase";
+import { fetchPozos, fetchResumenCalidadZonas } from "@/lib/dbQueries";
 import ChatBot from "@/components/ChatBot";
 
 const WaterMap = dynamic(() => import("@/components/WaterMap"), { ssr: false });
@@ -37,6 +39,7 @@ export default function Home() {
   const [reportingMode, setReportingMode] = useState(false);
   const [pendingReport, setPendingReport] = useState<{ lat: number; lng: number } | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
+  const [waterSources, setWaterSources] = useState<WaterSource[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
   const filteredSources = useMemo(() => {
@@ -47,6 +50,17 @@ export default function Home() {
       return waterSources.filter((s) => s.type === filter);
     return waterSources;
   }, [filter]);
+
+  // Load real water data from Supabase
+  useEffect(() => {
+    Promise.all([fetchPozos(), fetchResumenCalidadZonas()]).then(([pozos, zonas]) => {
+      const sources = [
+        ...mapPozosToSources(pozos),
+        ...mapZonasToSources(zonas),
+      ];
+      setWaterSources(sources.length > 0 ? sources : []);
+    });
+  }, []);
 
   const fetchReports = useCallback(async () => {
     const { data } = await supabase

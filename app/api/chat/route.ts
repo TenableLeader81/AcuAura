@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createClient } from "@supabase/supabase-js";
-import { waterSources } from "@/data/waterSources";
 import { NextRequest, NextResponse } from "next/server";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -15,36 +14,37 @@ export async function POST(req: NextRequest) {
     const { message, history } = await req.json();
     if (!message?.trim()) return NextResponse.json({ error: "Mensaje vacío" }, { status: 400 });
 
-    // Fetch reports from Supabase
-    const { data: reports } = await supabase
-      .from("reports")
-      .select("type, municipality, address, description, status, votes, user_name, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
-
-    // Build context
-    const reportSummary = buildReportSummary(reports ?? []);
-    const sourcesSummary = buildSourcesSummary();
+    // Fetch all context in parallel
+    const [
+      { data: reports },
+      { data: calidad },
+      { data: pozos },
+      { data: acuiferos },
+    ] = await Promise.all([
+      supabase.from("reports").select("type, municipality, address, description, status, votes, user_name, created_at").order("created_at", { ascending: false }).limit(100),
+      supabase.from("resumen_calidad_zona").select("*"),
+      supabase.from("pozo").select("codigo, profundidad_m, caudal_lps, latitud, longitud, acuifero(nombre)"),
+      supabase.from("acuifero").select("clave, nombre, superficie_km2"),
+    ]);
 
     const systemPrompt = `Eres AcuBot, el asistente inteligente de AcuAura — sistema de monitoreo hídrico de Querétaro, México.
-Respondes preguntas sobre calidad del agua, pozos, presas y reportes comunitarios de la ciudad.
+Respondes preguntas sobre calidad del agua, pozos, acuíferos, colonias y reportes comunitarios.
 Sé breve, claro y usa datos concretos. Responde siempre en español.
-Si no tienes datos para responder con certeza, dilo honestamente.
+Si no tienes datos suficientes, dilo honestamente.
 
-=== FUENTES DE AGUA MONITOREADAS ===
-${sourcesSummary}
+=== ACUÍFEROS DE QUERÉTARO ===
+${buildAcuiferosSummary(acuiferos ?? [])}
 
-=== RESUMEN DE REPORTES COMUNITARIOS ===
-${reportSummary}
+=== POZOS MONITOREADOS ===
+${buildPozosSummary(pozos ?? [])}
 
-=== TIPOS DE REPORTE ===
-- sin_agua: Sin servicio de agua
-- fuga: Fuga o desperdicio de agua
-- contaminacion: Agua contaminada o con mal olor/sabor
-- baja_presion: Poca presión en las tuberías
-- otro: Otros problemas
+=== CALIDAD DEL AGUA POR COLONIA ===
+${buildCalidadSummary(calidad ?? [])}
 
-Responde de forma conversacional y útil. Si preguntan por una colonia o municipio específico, filtra la información relevante.`;
+=== REPORTES COMUNITARIOS ===
+${buildReportSummary(reports ?? [])}
+
+Responde de forma conversacional. Si preguntan por una colonia o zona específica, filtra la información relevante.`;
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
@@ -68,9 +68,24 @@ Responde de forma conversacional y útil. Si preguntan por una colonia o municip
   }
 }
 
-function buildSourcesSummary(): string {
-  return waterSources.map((s) =>
-    `• ${s.name} (${s.type}, ${s.municipality}) — Calidad: ${s.qualityLevel} (${s.quality.score}/100) | pH: ${s.quality.ph} | Turbidez: ${s.quality.turbidity} NTU | Nitratos: ${s.quality.nitrates} mg/L | ${s.active ? "Activo" : "Inactivo"}`
+function buildAcuiferosSummary(acuiferos: any[]): string {
+  if (!acuiferos.length) return "Sin datos de acuíferos.";
+  return acuiferos.map((a) =>
+    `• ${a.nombre} (clave: ${a.clave}) — Superficie: ${a.superficie_km2 ?? "N/D"} km²`
+  ).join("\n");
+}
+
+function buildPozosSummary(pozos: any[]): string {
+  if (!pozos.length) return "Sin datos de pozos.";
+  return pozos.map((p) =>
+    `• Pozo ${p.codigo} — Acuífero: ${p.acuifero?.nombre ?? "N/D"} | Prof: ${p.profundidad_m}m | Caudal: ${p.caudal_lps} L/s`
+  ).join("\n");
+}
+
+function buildCalidadSummary(calidad: any[]): string {
+  if (!calidad.length) return "Sin datos de calidad del agua.";
+  return calidad.map((c) =>
+    `• ${c.zona} — ${c.clasificacion ?? "Sin clasificar"} | pH: ${c.ph ?? "N/D"} | Turbidez: ${c.turbiedad_ntu ?? "N/D"} NTU | Cloro: ${c.cloro_residual_libre_mg_l ?? "N/D"} mg/L | Coliformes: ${(c.coliformes_fecales_100ml ?? 0) + (c.coliformes_totales_100ml ?? 0)} | Fuente: ${c.fuente ?? "N/D"} (${c.tipo_fuente ?? ""}) | Fecha: ${c.ultima_fecha ?? "N/D"}`
   ).join("\n");
 }
 
